@@ -76,11 +76,26 @@ li.own .n{color:var(--mut);text-decoration:line-through}
 </main>
 <script>
 (function(){
-var KEY="kyara-tracker-v1",S={cards:[],owned:{}},filter="miss",lim=300;
+var KEY="kyara-tracker-v2",S={cards:[],owned:{},rawText:""},filter="miss",lim=300;
 var $=function(i){return document.getElementById(i)};
 function norm(s){return s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[’']/g,"'").replace(/\s+/g," ").trim()}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
-function restore(){try{var r=localStorage.getItem(KEY);if(r){var d=JSON.parse(r);if(d&&d.cards){S=d}}}catch(e){}}
+function restore(){
+  try{
+    var r=localStorage.getItem(KEY);
+    if(r){
+      var d=JSON.parse(r);
+      if(d){
+        if(d.cards) S.cards=d.cards;
+        if(d.owned) S.owned=d.owned;
+        if(d.rawText){
+          S.rawText=d.rawText;
+          $("all").value=d.rawText;
+        }
+      }
+    }
+  }catch(e){}
+}
 function say(t){$("msg").textContent=t}
 function parse(t){
   t=t.replace(/\s*\u00b7?\s*(#\d{3,5})(?=[ \t]*(\r?\n|$))/g," \u00b7 $1");
@@ -92,59 +107,11 @@ function parse(t){
   return out;
 }
 function load(){
-  var cards=parse($("all").value);
+  var raw=$("all").value;
+  var cards=parse(raw);
   var o={};cards.forEach(function(c){if(S.owned[c.id])o[c.id]=1});
-  S.cards=cards;S.owned=o;save();render();
-  say(cards.length?cards.length+" cartes chargées.":"Aucune carte reconnue : format inattendu.");
+  S.cards=cards;S.owned=o;S.rawText=raw;save();render();
+  say(cards.length?cards.length+" cartes chargées et sauvegardées.":"Aucune carte reconnue : format inattendu.");
 }
 function mark(){
-  var t=$("mine").value,w=parse(t),n=0,ids={},names={};
-  if(w.length&&w[0].id.charAt(0)==="#"){w.forEach(function(c){ids[c.id]=1})}
-  else t.split(/\r?\n/).forEach(function(l){var k=norm(l.split(/[|;\t]/)[0]);if(k)names[k]=1});
-  S.cards.forEach(function(c){if((ids[c.id]||names[norm(c.name)])&&!S.owned[c.id]){S.owned[c.id]=1;n++}});
-  save();render();say(n+" carte(s) marquée(s) comme possédée(s).");
-}
-function render(){
-  var tot=S.cards.length,own=S.cards.filter(function(c){return S.owned[c.id]}).length;
-  $("sTot").textContent=tot;$("sOwn").textContent=own;$("sMiss").textContent=tot-own;
-  $("fill").style.width=(tot?own/tot*100:0)+"%";
-  var q=norm($("q").value),ul=$("list");ul.textContent="";
-  var shown=S.cards.filter(function(c){
-    var o=!!S.owned[c.id];
-    if(filter==="miss"&&o)return false;
-    if(filter==="own"&&!o)return false;
-    if($("rar").value&&c.rar!==$("rar").value)return false;
-    return !q||norm(c.name+" "+c.set).indexOf(q)>-1;
-  });
-  if(!shown.length){var e=document.createElement("div");e.className="empty";
-    e.textContent=tot?(filter==="miss"?"Rien à afficher. Collection complète, ou recherche trop stricte.":"Rien à afficher."):"Charge d’abord la liste complète des cartes.";
-    ul.appendChild(e);return}
-  shown.slice(0,lim).forEach(function(c){
-    var li=document.createElement("li"),cb=document.createElement("input"),n=document.createElement("span");
-    cb.type="checkbox";cb.checked=!!S.owned[c.id];cb.setAttribute("aria-label","Possédée : "+c.name);
-    cb.onchange=function(){if(cb.checked)S.owned[c.id]=1;else delete S.owned[c.id];save();render()};
-    n.className="n";n.textContent=c.name;li.className=cb.checked?"own":"";
-    li.appendChild(cb);li.appendChild(n);
-    [c.set,c.rar].forEach(function(t){if(t){var s=document.createElement("span");s.className="tag";s.textContent=t;li.appendChild(s)}});
-    ul.appendChild(li);
-  });
-  if(shown.length>lim){var m=document.createElement("button");m.className="ghost";m.style.marginTop="12px";
-    m.textContent="Afficher plus ("+(shown.length-lim)+" restantes)";m.onclick=function(){lim+=300;render()};ul.appendChild(m)}
-}
-function copyMissing(){
-  var t=S.cards.filter(function(c){return !S.owned[c.id]}).map(function(c){return [c.name,c.set,c.rar].filter(Boolean).join(" | ")}).join("\n");
-  function ok(){say("Liste des manquantes copiée.")}
-  function fb(){var a=document.createElement("textarea");a.value=t;document.body.appendChild(a);a.select();try{document.execCommand("copy");ok()}catch(e){say("Copie impossible.")}document.body.removeChild(a)}
-  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(ok,fb)}else fb();
-}
-document.querySelectorAll("[data-f]").forEach(function(b){b.onclick=function(){
-  filter=b.getAttribute("data-f");lim=300;
-  document.querySelectorAll("[data-f]").forEach(function(x){x.className=x===b?"on":"ghost"});render()}});
-$("load").onclick=load;$("mark").onclick=mark;$("copy").onclick=copyMissing;$("q").oninput=function(){lim=300;render()};$("rar").onchange=function(){lim=300;render()};
-$("clear").onclick=function(){S={cards:[],owned:{}};$("all").value="";$("mine").value="";save();render();say("Données effacées.")};
-restore();
-render();
-})();
-</script>
-</body>
-</html>
+  var t
